@@ -947,7 +947,185 @@ public class HorseRace {
 ```
 
 - DelayQueue
+- PriorityBlockingQueue
+- ScheduledThreadPoolExecutor
 - Semaphore
+
+*计数信号量*允许n个任务同时访问同一项资源
+
+```java
+package semaphore_demo;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Semaphore;
+
+// Using a Semaphore inside a Pool, to restrict the number of tasks that can use a resource.
+public class Pool<T> {
+
+    private int size;
+    private List<T> items = new ArrayList<T>();
+    private volatile boolean[] checkedOut;
+    private Semaphore available;
+
+    public Pool(Class<T> classObject, int size) {
+        this.size = size;
+        checkedOut = new boolean[size];
+        available = new Semaphore(size, true);
+        // Load pool with objects that can be checked out:
+        for (int i = 0; i < size; i ++) {
+            try {
+                // Assumes a default constructor:
+                items.add(classObject.newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException();
+            }
+        }
+    }
+
+    public T checkOut() throws InterruptedException {
+        available.acquire();
+        return getItem();
+    }
+
+    public void checkIn(T x) {
+        if (releaseItem(x)) {
+            available.release();
+        }
+    }
+
+    private synchronized T getItem() {
+        for (int i = 0; i < size; i ++) {
+            if (!checkedOut[i]) {
+                checkedOut[i] = true;
+                return items.get(i);
+            }
+        }
+        return null; // Semaphore prevents reaching here.
+    }
+
+    private synchronized boolean releaseItem(T item) {
+        int index = items.indexOf(item);
+        if (index == -1) {
+            // Not in the list
+            return false;
+        }
+        if (checkedOut[index]) {
+            checkedOut[index] = false;
+            return true;
+        }
+        return false; // Wasn't checked out
+    }
+}
+```
+
+```java
+package semaphore_demo;
+
+// Objects that are expensive to create
+public class Fat {
+
+    private volatile double d;
+    private static int counter = 0;
+    private final int id = counter ++;
+
+    public Fat() {
+        // Expensive, interruptible operation:
+        for (int i = 0; i < 10000; i ++) {
+            d += (Math.PI + Math.E) / (double)i;
+        }
+    }
+
+    public void operattion() {
+        System.out.println(this);
+    }
+
+    public String toString() {
+        return "Fat id:" + id;
+    }
+}
+```
+
+```java
+package semaphore_demo;
+// Test the Pool class
+
+import java.sql.Time;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+// A task to check a resource out of a pool
+class CheckoutTask<T> implements Runnable {
+
+    private static int counter = 0;
+    private final int id = counter ++;
+    private Pool<T> pool;
+
+    public CheckoutTask(Pool<T> pool) {
+        this.pool = pool;
+    }
+
+    public void run() {
+        try {
+            T item = pool.checkOut();
+            System.out.println(this + "cheked out " + item);
+            TimeUnit.SECONDS.sleep(1);
+            System.out.println(this + "cheked in " + item);
+            pool.checkIn(item);
+        } catch (InterruptedException e) {
+            // Available way to terminate
+        }
+    }
+
+    public String toString() {
+        return "CheckoutTask " + id + " ";
+    }
+}
+
+public class SemaphoreDemo {
+
+    final static int SIZE = 25;
+    public static void main(String[] args) throws Exception {
+        final Pool<Fat> pool = new Pool<Fat>(Fat.class, SIZE);
+        ExecutorService exec = Executors.newCachedThreadPool();
+        for (int i = 0; i < SIZE; i ++) {
+            exec.execute(new CheckoutTask<Fat>(pool));
+        }
+        System.out.println("All CheckoutTasks created");
+        List<Fat> list = new ArrayList<Fat>();
+        for (int i = 0; i < SIZE; i ++) {
+            Fat f = pool.checkOut();
+            System.out.println(i + ": main() thread checked out ");
+            f.operattion();
+            list.add(f);
+        }
+        Future<?> blocked = exec.submit(() -> {
+            try {
+                // Semaphore prevents additional checkout.
+                // so call is blocked:
+                pool.checkOut();
+            } catch (InterruptedException e) {
+                System.out.println("checkOut() Interrupted");
+            }
+        });
+        TimeUnit.SECONDS.sleep(2);
+        blocked.cancel(true);
+        System.out.println("Checking in objects in " + list);
+        for (Fat f : list) {
+            pool.checkIn(f);
+        }
+        for (Fat f : list) {
+            pool.checkIn(f); // Second checkIn ignored
+        }
+        exec.shutdown();
+    }
+}
+```
+
 - Exchanger
 
 ### 免锁容器
