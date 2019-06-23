@@ -665,7 +665,7 @@ public class WaxOMatic2 {
 
 java.util.concurrent.BlockingQueue 接口中提供了同步队列来解决任务协作问题。
 
-- LinkedBlockingQueue 无届队列
+- LinkedBlockingQueue 无界队列
 - ArrayBlockingQueue 固定尺寸
 
 如果消费者任务试图从队列中获取对象，而该队列此时为空，那么这些队列还可以挂起消费者任务，并且当有更多的元素可用时恢复消费者队列。
