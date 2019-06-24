@@ -1036,7 +1036,7 @@ public class Fat {
         }
     }
 
-    public void operattion() {
+    public void operation() {
         System.out.println(this);
     }
 
@@ -1100,7 +1100,7 @@ public class SemaphoreDemo {
         for (int i = 0; i < SIZE; i ++) {
             Fat f = pool.checkOut();
             System.out.println(i + ": main() thread checked out ");
-            f.operattion();
+            f.operation();
             list.add(f);
         }
         Future<?> blocked = exec.submit(() -> {
