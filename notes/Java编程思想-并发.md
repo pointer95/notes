@@ -1141,3 +1141,37 @@ public class SemaphoreDemo {
 Exchanger 是在两个任务之间交换对象的栅栏。当这些任务进入栅栏时，它们各自拥有一个对象，当它们离开时，它们都拥有之前由对象持有的对象。典型的应用场景是：一个任务在创建对象时，这些对象的生产代价很高昂，而另一个任务在消费这些对象。通过这种方式，可以有更多的对象在被创建的同时被消费。
 
 ### 免锁容器
+
+免锁容器通过更灵巧的技术来消除加锁，从而提高线程安全的性能。
+
+免锁容器的通用策略是：对容器的修改可以与读取操作同时发生，只要读取者只能看到完成修改的结果即可。修改是在容器数据结构的某个部分的一个单独的副本（有时是整个数据结构的副本）上执行的，并且这个副本在修改过程中是不可视的。只有当修改完成时，被修改的结构才会自动地与主数据结构进行交换，之后读取者就可以看到这个修改了。
+
+- CopyOnWriteArrayList
+
+在 CopyOnWriteArrayList 中，写入将导致创建整个底层数组的副本，而源数组将保留在原地，使得复制的数组在被修改时，读取操作可以安全的进行。当修改完成时，一个原子性的操作将把新的数组换入，使得新的读取操作可以看到这个新的修改。
+
+CopyOnWriteArrayList 的好处之一是当多个迭代器同时遍历和修改这个列表时，不会抛出 ConcurrentModificationException。
+
+- CopyOnWriteArraySet
+
+CopyOnWriteArraySet 使用 CopyOnWriteArrayList 来实现其免锁行为。
+
+- ConcurrentHashMap
+
+允许并发的读取和写入，但是容器中只有部分内容而不是整个容器可以被复制和修改。然而任何修改在完成之前，读取者仍旧不能看到它们。
+
+不会抛出ConcurrentModificationException。
+
+补充：
+
+jdk1.8 使用了 CAS 操作来支持更高的并发度，当CAS操作失败时使用 synchronized。
+
+当链表过长时转成红黑树。
+
+- ConcurrentLinkedQueue
+
+ConcurrentLinkedQueue 实现类似于 ConcurrentHashMap
+
+### ReadWriteLock
+
+ReadWriteLock 对向数据结构相对不频繁地写入，但是有多个任务要经常读取这个数据结构的这类情况进行了优化。如果写锁已经被其他任务持有，那么任何读取者都不能访问，直至这个写锁被释放为止。
