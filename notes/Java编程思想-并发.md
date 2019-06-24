@@ -953,6 +953,8 @@ public class HorseRace {
 
 *计数信号量*允许n个任务同时访问同一项资源
 
+下面的例子 Pool 是一个对象池，管理着数量有限的对象。当要使用对象时可以签出它们，当使用完毕时可以将它们签回。
+
 ```java
 package semaphore_demo;
 
@@ -1050,7 +1052,6 @@ public class Fat {
 package semaphore_demo;
 // Test the Pool class
 
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
