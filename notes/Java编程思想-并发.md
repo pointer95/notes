@@ -947,8 +947,17 @@ public class HorseRace {
 ```
 
 - DelayQueue
+
+DelayQueue 是一个无界的 BlockingQueue，用于放置实现了 Delayed 接口的对象。其中的对象只能在其到期时才能从队列中取走。这种队列是有序的，即队头对象的延迟到期的时间最长。如果没有任何延迟到期，那么不会有任何头元素。
+
 - PriorityBlockingQueue
+
+优先级队列中的对象是按照优先级顺序从队列中出现的任务。
+
 - ScheduledThreadPoolExecutor
+
+ScheduledThreadPoolExecutor 提供了解决在预定时间运行任务的服务。通过使用 schedule() （运行一次任务）或者 scheduleAtFixedRate() （每隔规则饿时间重复执行任务），可以将 Runnable 对象设置为在将来的某个时刻执行。
+
 - Semaphore
 
 *计数信号量*允许n个任务同时访问同一项资源
@@ -1128,5 +1137,7 @@ public class SemaphoreDemo {
 ```
 
 - Exchanger
+
+Exchanger 是在两个任务之间交换对象的栅栏。当这些任务进入栅栏时，它们各自拥有一个对象，当它们离开时，它们都拥有之前由对象持有的对象。典型的应用场景是：一个任务在创建对象时，这些对象的生产代价很高昂，而另一个任务在消费这些对象。通过这种方式，可以有更多的对象在被创建的同时被消费。
 
 ### 免锁容器
