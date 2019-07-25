@@ -66,3 +66,178 @@ happens-before 仅要求前一个操作对后一个操作可见，且前一个�
 #### 重排序对多线程的影响
 
 在多线程程序中，对存在控制依赖的操作重排序，可能会改变程序的执行结果。
+
+### 顺序一致性
+
+#### 数据竞争与顺序一致性
+
+数据竞争是指：
+
+> 在一个线程中写一个变量，
+>
+> 在另一个线程读一个变量，
+>
+> 而且写和读没有通过同步来排序。
+
+如果程序是正确同步的，程序的执行将具有顺序一致性——即程序的执行结果与程序在顺序一致性内存模型中的执行结果相同。
+
+#### 顺序一致性内存模型
+
+特性：
+
+- 一个线程中的所有操作必须按照程序的顺序来执行
+- 所有线程都只能看到一个单一的操作执行顺序。在顺序一致性内存模型中，每个操作都必须原子执行且立刻对所有线程可见。
+- 保证对所有的内存读 / 写操作都具有原子性
+
+#### 同步程序和顺序一致性效果
+
+JMM 的具体实现为，在正确同步的程序执行结果的前提下，尽可能地为编译器和处理器的优化打开方便之门。
+
+#### 未同步程序的执行特性
+
+JMM 不保证对 64 位的 long 型和 double 型变量的写操作具有原子性。
+
+### volatile 的内存语义
+
+#### volatile 的特性
+
+- 可见性。对一个 volatile 变量的读，总是能看到（任意线程）对这个 volatile 变量最后的写入。
+- 原子性。对任意单个 volatile 变量的读 / 写具有原子性。
+
+#### volatile 写 - 读建立的 happens-before 关系
+
+从 JDK5 开始，volatile 变量的写 - 读可以实现线程之间的通信。
+
+从内存语义的角度来说，volatile 的写 - 读与锁的释放 - 获取有相同的内存效果。
+
+volatile 规则可以得到 happens-before 关系
+
+#### volatile 的写 - 读的内存语义
+
+- 线程 A 写一个 volatile 变量，实质上是线程 A 向接下来将要读这个 volatile 的某个线程发出了消息
+- 线程 B 读一个 volatile 变量，实质上是线程 B 接收了之前某个线程发出的消息
+
+- 线程 A 写一个 volatile 变量，随后线程 B 读这个 volatile 变量，这个过程实质上是线程 A 通过主内存向线程 B 发送消息。
+
+#### volatile 内存语义的实现
+
+为了实现 volatile 内存语义，JMM 会分别限制编译器重排序和处理器重排序。
+
+- 当第二个操作是 volatile 写时，不管第一个操作是什么，都不能重排序。这个规则确保 volatile 写之前的操作不会被编译器重排序到 volatile 写之后。
+- 当第一个操作是 volatile 读时，不管第二个操作是什么，都不能重排序。这个规则确保 volatile 读之后的操作不会被编译器重排序到 volatile 读之前。
+- 当第一个操作是 volatile 写，第二个操作是 volatile 读时，不能重排序。
+
+### 锁的内存语义
+
+#### 锁的释放 - 获取建立的 happens-before 关系
+
+监视器锁规则可以得到 happens-before 关系。
+
+#### 锁的释放和获取的内存语义
+
+- 线程 A 释放一个锁，实质上是线程 A 向接下来将要获取这个锁的某个线程发出了消息
+- 线程 B 获取一个锁，实质上是线程 B 接收了之前某个线程发出的消息
+- 线程 A 释放锁，随后线程 B 获取这个锁，这个过程实质上是线程 A 通过主内存向线程 B 发送消息
+
+#### 锁内存语义的实现
+
+- 公平锁和非公平锁释放时，最后都要写一个 volatile 变量 state
+- 公平锁获取时，首先会去读 volatile 变量
+- 非公平锁获取时，首先会用 CAS 更新 volatile 变量，这个操作同时具有 volatile 读和 volatile 写的内存语义
+
+#### concurrent 包的实现
+
+首先，声明共享变量为 volatile 。
+
+然后，使用 CAS 的原子条件更新来实现线程之间的同步。
+
+同时，配合以 volatile 的 读 / 写和 CAS 所具有的 volatile 读和写的内存语义来实现线程之间的通信。
+
+### final 域的内存语义
+
+#### final 域的重排序规则
+
+- 在构造函数内对一个 final 域的写入，与随后把这个被构造对象的引用赋值给一个引用变量，这两个操作之间不能重排序
+- 初次读一个包含 final 域的对象的引用，与随后初次读这个 final 域，这两个操作之间不能重排序
+
+```java
+public class FinalExample {
+    int i;
+    final int j;
+    static FinalExample obj;
+    
+    public FinalExample() {
+        i = 1;
+        j = 2;
+    }
+    
+    public static void writer() {
+        obj = new FinalExample();
+    }
+    
+    public static void reader() {
+        FinalExample object = obj;
+        int a = object.i;
+        int b = object.j;
+    }
+}
+```
+
+#### 写 final 域的重排序规则
+
+在对象引用为任意线程可见之前，对象的 final 域已经被正确初始化过了，而普通域不具有这个保障。在读线程看到对象引用 obj 时，很可能 obj 对象还没构造完成，因为对普通域 i 的写操作被重排序到构造函数之外。
+
+#### 读 final 域的重排序规则
+
+在读一个对象的 final 域之前，一定会先读包含这个 final 域的对象的引用。即先读 obj 对象，再读 j 。
+
+#### final 域为引用类型
+
+在构造函数内对一个 final 引用的对象的成员域的写入，与随后在构造函数外把这个被构造对象的引用赋值给一个引用变量，这两个操作之间不能重排序。
+
+#### 为什么 final 引用不能从构造函数内逸出
+
+```java
+public class FinalReferenceEscapeExample {
+    final int i;
+    static FinalReferenceEscapeExample obj;
+    
+    public FinalReferenceEscapeExample() {
+        i = 1;
+        obj = this; // this 引用逸出
+    }
+    
+    public static void writer() {
+        new FinalReferenceEscapeExample();
+    }
+    
+    public static void reader() {
+        if (obj != null) {
+            int temp = obj.i;
+        }
+    }
+}
+```
+
+在构造函数返回前，被构造对象的引用不能为其他线程所见，因为此时的 final 域可能还没有被初始化。
+
+### happens-before
+
+#### JMM 的设计
+
+- 会改变程序的重排序，JMM 要求编译器和处理器必须禁止这种重排序
+- 不会改变程序的重排序，JMM 对编译器和处理器不做要求
+
+#### happens-before 的定义
+
+- 如果一个操作 happens-before 另一个操作，那么第一个操作的执行结果将对第二个操作可见，而且第一个操作的执行顺序排在第二个操作之前
+- 两个操作之间存在 happens-before 关系，并不意味着 Java 平台的具体实现必须要按照 happens-before 关系指定的顺序来执行
+
+#### happens-before 规则
+
+- 程序顺序规则：一个线程中的每个操作，happens-before 于该线程中的任意后续操作
+- 监视器锁规则：对于一个锁的解锁，happens-before 于随后对这个锁的加锁
+- volatile 变量规则：对一个 volatile 域的写，happens-before 于任意后续对这个 volatile 域的读
+- 传递性：如果 A happens-before B，且 B happens-before C ，那么 A happens-before C
+- start() 规则：如果线程 A 执行操作 ThreadB.start() ，那么线程 A 的 ThreadB.start() 操作 happens-before 于线程 B 中的任意操作
+- join() 规则：如果线程 A 执行操作 ThreadB.join() 并成功返回，那么线程 B 中的任意操作 happens-before 于线程 A 从 ThreadB.join() 操作成功返回
