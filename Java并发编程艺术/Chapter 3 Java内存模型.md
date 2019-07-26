@@ -241,3 +241,76 @@ public class FinalReferenceEscapeExample {
 - 传递性：如果 A happens-before B，且 B happens-before C ，那么 A happens-before C
 - start() 规则：如果线程 A 执行操作 ThreadB.start() ，那么线程 A 的 ThreadB.start() 操作 happens-before 于线程 B 中的任意操作
 - join() 规则：如果线程 A 执行操作 ThreadB.join() 并成功返回，那么线程 B 中的任意操作 happens-before 于线程 A 从 ThreadB.join() 操作成功返回
+
+### 双重检查锁定与延迟初始化
+
+在 Java 多线程程序中，有时候需要采用延迟初始化来降低初始化类和创建对象的开销。
+
+双重检查锁定是常见的延迟初始化技术，但它是一个错误的用法。
+
+#### 双重检查锁定的由来
+
+```java
+public class DoubleCheckedLocking {
+    private static Instance instance;
+    
+    public static Instance getInstance() {
+        if (instance == null) {
+            synchronized (DoubleCheckedLocking.class) {
+                if (instance == null) {
+                    instance = new Instance();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+代码第一次读取到 instance 不为 null 时，instance 引用的对象有可能还没有完成初始化。
+
+#### 问题的根源
+
+在单线程程序中，初始化对象和设置 instance 指向内存空间被重排序，但不会影响执行结果。而在多线程程序中，其他线程很有可能会看到一个还没有完全初始化的对象。
+
+解决方法：
+
+- 不允许初始化对象和设置 instance 指向内存空间重排序
+- 允许初始化对象和设置 instance 指向内存空间被重排序，但不允许其他线程看到这个重排序
+
+#### 基于 volatile 的解决方案
+
+```java
+public class SafeDoubleCheckedLocking {
+    private volatile static Instance instance;
+    
+    public static Instance getInstance() {
+        if (instance == null) {
+            synchronized (DoubleCheckedLocking.class) {
+                if (instance == null) {
+                    instance = new Instance();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+#### 基于类初始化的解决方案
+
+JVM 在类的初始化阶段，会获取一个锁，这个锁可以同步多个线程对同一个类的初始化。
+
+```java
+public class InstanceFactory {
+    private static class InstanceHolder {
+        public static Instance instance = new Instance();
+    }
+    
+    public static Instance getInstance() {
+        return InstanceHolder.instance;
+    }
+}
+```
+
+在大多数情况下，正确的初始化要优于延迟初始化。基于 volatile 的延迟初始化的方案适用于对实例字段初始化；基于类的延迟初始化方案适用于对静态字段初始化。
