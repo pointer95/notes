@@ -513,6 +513,7 @@ public interface Condition {
             if (Thread.interrupted())
                 throw new InterruptedException();
             Node node = addConditionWaiter();
+            // 释放同步状态并记录
             int savedState = fullyRelease(node);
             int interruptMode = 0;
             while (!isOnSyncQueue(node)) {
@@ -558,4 +559,4 @@ isHeldExclusively() 检查当前线程是否获取了锁的线程。
 
 成功获取同步状态之后，被唤醒的线程将从先前调用的 await() 方法返回。
 
-Condition 的 signal() 方法，相当于对等待队列中的每个节点均执行一次 signal() 方法，效果就是将等待队列中所有节点全部移动到同步队列中，并唤醒每个节点的线程。
+Condition 的 signalAll() 方法，相当于对等待队列中的每个节点均执行一次 signal() 方法，效果就是将等待队列中所有节点全部移动到同步队列中，并唤醒每个节点的线程。
