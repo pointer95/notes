@@ -1,0 +1,203 @@
+# 走近 Java
+
+## Java 内存区域与内存溢出异常
+
+### 运行时数据区域
+
+#### 程序计数器
+
+在虚拟机的概念模型里，字节码解释器工作时就是通过改变这个计数器的值来选取下一条需要执行的字节码指令。
+
+为了线程切换后能恢复到正确的执行位置，每条线程都需要有一个独立的程序计数器，各条线程之间计数器互不影响，独立存储，即线程私有内存。
+
+如果线程正在执行的是一个 Java 方法，这个计数器记录的是正在执行的虚拟机字节码指令的地址；如果正在执行的是 Native 方法，这个计数器值则为空（Undefined）。此内存是唯一一个在 Java 虚拟机规范中没有规定任何 OutOfMemoryError 情况的区域。
+
+#### Java 虚拟机栈
+
+线程私有内存，生命周期与线程相同。
+
+虚拟机栈描述的是 Java 方法执行的内存模型：每个方法在执行的同时创建一个栈帧（Stack Frame）用于存储局部变量表、操作数栈、动态链接、方法出口等信息。每一个方法从调用直至执行完成的过程，就对应一个栈帧在虚拟机栈中从入栈道出栈的过程。
+
+局部变量表存放了编译器可知的各种基本数据类型（boolean、byte、char、short、int、float、long、double）、对象引用类型（reference）和 returnAddress 类型（指向了一条字节码指令的地址）。其中 64 位长度的 long 和 double 类型的数据会占用 2 个局部变量空间（Slot）。
+
+局部变量表所需的内存空间在编译期间完成分配，当进入一个方法时，这个方法需要在帧中分配多大的局部变量空间是完全确定的，在方法运行期间不会改变局部变量表的大小。
+
+异常情况：
+
+- 线程请求的栈深度大于虚拟机所允许的深度，抛出 StackOveflowError 异常
+- 虚拟机栈动态扩展时无法申请到足够的内存，抛出 OutOfMemoryError 异常
+
+#### 本地方法栈
+
+与虚拟机栈类似，执行虚拟机使用到的 Native 方法服务。
+
+#### Java 堆
+
+几乎所有的对象实例以及数组都在堆上分配。
+
+Java 堆可以分为新生代和老年代，进一步分为 Eden 空间、From Survivor 空间、To Survivor 空间等。
+
+Java 堆可以处于物理上不连续的内存空间中，只要逻辑上时连续的即可。
+
+如果在堆中没有内存完成实例分配，并且堆也无法再扩展时，将会抛出 OutOfMemoryError 异常。
+
+#### 方法区
+
+与堆一样，是各个线程共享的内存区域，它用于存储已被虚拟机加载的类信息、常量、静态变量、即时编译器编译后的代码等数据。
+
+#### 运行时常量池
+
+运行时常量池是方法区的一部分。Class 文件中除了有类的版本、字段、方法、接口等描述信息外，还有一项信息是常量池，用于存放编译器生成的各种字面量和符号引用，这部分内容将在类加载后进入方法区的运行时常量池中存放。
+
+#### 直接内存
+
+NIO 类中引入的一种基于通道（Channel）与缓冲区（Buffer）的 I/O 方式，它可以使用 Native 函数库直接分配堆外内存，然后通过一个存储在 Java 堆中的 DirectByteBuffer 对象作为这块内存的引用进行操作。这样能在一些场景中显著提高性能，因为避免了在 Java 堆和 Native 堆中来回复制数据。
+
+### HotSpot 虚拟机对象探秘
+
+#### 对象的创建
+
+1. 检查 new 指令的参数是否能在常量池中定位到一个类的符号引用，并且在检查这个符号引用代表的类是否已被加载、解析和初始化过。如果没有，那必须先执行相应的类加载过程。
+2. 为新生对象分配内存。对象所需的大小在类加载完成后便可完全确定。
+3. 将分配到的内存空间都初始化为零值（不包括对象头）。
+4. 对对象进行必要的设置，例如这个对象是哪个类的实例、如何才能找到类的元数据信息、对象的哈希码、对象的 GC 分代年龄等信息。
+5. 执行 init 方法，把对象按照程序猿的意愿进行初始化。
+
+#### 对象的内存布局
+
+对象在内存中存储的布局可以分为 3 块区域：对象头（Header）、实例数据（Instance Data）和对齐填充（Padding）。
+
+对象头分为两部分：
+
+- MarkWord
+
+|               存储内容                | 标志位 |    状态    |
+| :-----------------------------------: | :----: | :--------: |
+|       对象哈希码、对象分代年龄        |   01   |   未锁定   |
+|           指向锁记录的指针            |   00   | 轻量级锁定 |
+|        指向那个重量级锁的指针         |   10   |    膨胀    |
+|                  空                   |   11   |  GC 标记   |
+| 偏向线程 ID、偏向时间戳、对象分代年龄 |   01   |   可偏向   |
+
+- 类型指针，即对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是哪个类的实例。如果对象是一个 Java 数组，那在对象头中还必须有一块用于记录数组长度的数据。
+
+实例数据是对象真正存储的有效信息。
+
+对齐填充起着占位符的作用。
+
+#### 对象的访问定位
+
+- 句柄访问。Java 堆中将会划分出一块内存来作为句柄池，reference 中存储的是对象的句柄地址，而句柄中包含了对象实例数据与类型数据各自的具体地址信息。
+- 直接指针访问。reference中存储的直接就是对象地址，对象实例数据中存储类型数据的指针。
+
+使用句柄访问的好处是在对象被移动时只会改变句柄中的实例数据指针，reference 本身不需要改变；使用直接指针访问的好处是速度快，节省一次指针定位的时间开销。HotSpot 使用第二种方式。
+
+### 实战：OutOfMemoryError 异常
+
+#### Java 堆溢出
+
+不断创建对象，并且保证 GC Roots 到对象之间有可达路径来避免垃圾回收机制清除这些对象。
+
+通过参数 -XX:+HeapDumpOnOutOfMemoryError 可以让虚拟机在出现内存溢出时 Dump 出当前的内存堆转储快照。
+
+```java
+/**
+ * VM Args: -Xms20m -Xmx20m -XX:+HeapDumpOnOutOfMemoryError
+ */
+public class HeapOOM {
+    
+    static class OOMObject {
+    }
+    
+    public static void main(String[] args) {
+        List<OOMObject> list = new ArrayList<OOMObject>();
+        
+        while (true) {
+            list.add(new OOMObject());
+        }
+    }
+}
+```
+
+#### 虚拟机栈和本地方法栈溢出
+
+```java
+/**
+ * VM Args: -Xss128k
+ */
+public class JavaVMStackSOF {
+    
+    private int stackLength = 1;
+    
+    public void stackLeak() {
+        stackLength++;
+        stackLeak();
+    }
+    
+    public static void main(String[] args) throws Throwable {
+        JavaVMStackSOF sof = new JavaVMStackSOF();
+        try {
+            sof.stackLeak();
+        } catch (Throwable e) {
+            System.out.println("stack length:" + sof.stackLength);
+            throw e;
+        }
+    }
+}
+```
+
+#### 方法区和运行时常量池溢出
+
+基本的思路是运行时产生大量的类去填满方法区。
+
+```java
+/**
+ * VM Args: -XX:PermSIze=10M -XX:MaxPermSize=10M
+ */
+public class JavaMethodAreaOOM {
+    
+    public static void main(String[] args) {
+        while (true) {
+            Enhancer enhancer = new Enhancer();
+            enhancer.setSuperclass(OOMObject.class);
+            enhancer.setUserCache(false);
+            enhancer.setCallback(new MethodInterceptor() {
+                public Object intercept(Object obj,
+                                        Method method,
+                                        Object[] args,
+                                        MethodProxy proxy) throws Throwable {
+                    return proxy.invokeSuper(obj, args);
+                }
+            });
+            enhancer.create();
+        }
+    }
+    
+    static class OOMObject {
+        
+    }
+}
+```
+
+#### 本机直接内存溢出
+
+```java
+/**
+ * VM Args: -Xmx20M -XX:MaxDirectMemorySize=10M
+ */
+public class DirectMemoryOOM {
+    
+    private static final int _1MB = 1024 * 1024;
+    
+    public static void main(String[] args) throws Exception {
+        Field unsafeField = Unsafe.class.getDeclareFields()[0];
+        unsafeField.setAccessible(true);
+        Unsafe unsafe = (Unsafe) unsafeField.get(null);
+        while (true) {
+            unsafe.allocateMemory(_1MB);
+        }
+    }
+}
+```
+
+由直接内存导致的内存溢出，一个明显的特征是在 Heap Dump 文件中不会看见明显的异常。
