@@ -13,13 +13,13 @@
 
 1. GC 算法及批量任务
 
-   使用 Thoughput 收集器处理应用程序线程的批量任务能最大程度地利用 CPU 的处理能力，通常能获得更好的性能。如果批量任务并没有使用机器上所有可用的 CPU 资源，那么切换到 Concurrent 收集器往往能取得更好的性能。
+   使用 Throughput 收集器处理应用程序线程的批量任务能最大程度地利用 CPU 的处理能力，通常能获得更好的性能。如果批量任务并没有使用机器上所有可用的 CPU 资源，那么切换到 Concurrent 收集器往往能取得更好的性能。
 
 2. GC 算法和吞吐量测试
 
 3. GC 算法和相应时间测试
 
-   衡量标准是响应时间或吞吐量，在 Thoughput 收集器和 Concurrent 收集器之间做选择的依据主要是有多少空闲 CPU 资源能用于运行后台的并发线程。通常情况下，Thoughput 收集器的平均响应时间比 Concurrent 收集器要差，但是在 90% 响应时间或者 99% 响应时间这几项指标上，Thoughput 收集器比 Concurrent 收集器要好一些。使用 Thoughput 收集器会超负荷地进行大量 Full GC 时，切换到 Concurrent 收集器通常能获得更低的响应时间。
+   衡量标准是响应时间或吞吐量，在 Throughput 收集器和 Concurrent 收集器之间做选择的依据主要是有多少空闲 CPU 资源能用于运行后台的并发线程。通常情况下，Throughput 收集器的平均响应时间比 Concurrent 收集器要差，但是在 90% 响应时间或者 99% 响应时间这几项指标上，Throughput 收集器比 Concurrent 收集器要好一些。使用 Throughput 收集器会超负荷地进行大量 Full GC 时，切换到 Concurrent 收集器通常能获得更低的响应时间。
 
 4. CMS 收集器和 G1 收集器之间的抉择
 
